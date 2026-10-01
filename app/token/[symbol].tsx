@@ -30,6 +30,20 @@ export default function TokenPage() {
         ) : (
           <>
             <TokenMiniCard cashtag={symbol ?? ""} />
+            <View style={styles.tradeRow}>
+              <Pressable
+                style={[styles.tradeBtn, styles.buy]}
+                onPress={() => router.push({ pathname: "/(tabs)/trade", params: { symbol, inputMint: "So11111111111111111111111111111111111111112" } })}
+              >
+                <Text style={styles.buyT}>Buy</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.tradeBtn, styles.sell]}
+                onPress={() => router.push({ pathname: "/(tabs)/trade", params: { symbol, outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" } })}
+              >
+                <Text style={styles.sellT}>Sell</Text>
+              </Pressable>
+            </View>
             <View style={styles.soon}>
               <Text style={styles.soonT}>Full token page coming soon</Text>
               <Text style={styles.soonS}>
@@ -49,6 +63,12 @@ const styles = StyleSheet.create({
   back: { color: "#fff", fontSize: 22 },
   navT: { color: "#fff", fontSize: 17, fontWeight: "800" },
   pad: { padding: 14 },
+  tradeRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  tradeBtn: { flex: 1, borderRadius: 999, paddingVertical: 15, alignItems: "center" },
+  buy: { backgroundColor: "#00c853" },
+  sell: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#ff5252" },
+  buyT: { color: "#000", fontWeight: "800", fontSize: 16 },
+  sellT: { color: "#ff5252", fontWeight: "800", fontSize: 16 },
   soon: {
     backgroundColor: "#000", borderRadius: 24, borderWidth: 1, borderColor: "#2f3336",
     padding: 24, alignItems: "center", marginTop: 12,

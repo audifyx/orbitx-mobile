@@ -31,6 +31,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="u/[handle]" options={{ presentation: "card" }} />
           <Stack.Screen name="token/[symbol]" options={{ presentation: "card" }} />
+          <Stack.Screen name="launch" options={{ presentation: "modal" }} />
         </Stack>
       </AuthContext.Provider>
     </SafeAreaProvider>

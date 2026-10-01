@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { router } from "expo-router";
 import TokenMiniCard from "./TokenMiniCard";
 import { extractCashtags } from "../lib/market";
@@ -103,9 +104,19 @@ export default function PostCard({ post }: { post: Post }) {
 function EngBtn({
   icon, activeIcon, count, active, onPress,
 }: { icon: string; activeIcon?: string; count: number; active?: boolean; onPress: () => void }) {
+  const pop = useSharedValue(1);
+  const st = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const press = () => {
+    pop.value = withSpring(1.45, { damping: 6, stiffness: 400 }, () => {
+      pop.value = withSpring(1, { damping: 8, stiffness: 300 });
+    });
+    onPress();
+  };
   return (
-    <Pressable style={styles.engBtn} onPress={onPress}>
-      <Text style={[styles.engIcon, active && styles.engActive]}>{active && activeIcon ? activeIcon : icon}</Text>
+    <Pressable style={styles.engBtn} onPress={press}>
+      <Animated.Text style={[styles.engIcon, active && styles.engActive, st]}>
+        {active && activeIcon ? activeIcon : icon}
+      </Animated.Text>
       {count > 0 && <Text style={[styles.engCount, active && styles.engActive]}>{count}</Text>}
     </Pressable>
   );

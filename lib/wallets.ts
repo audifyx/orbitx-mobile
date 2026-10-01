@@ -131,6 +131,20 @@ export async function exportPrivateKey(chain: ChainId): Promise<string | null> {
   return HDNodeWallet.fromMnemonic(mnemonic, `m/44'/60'/0'/0/${idx}`).privateKey;
 }
 
+/** Solana Keypair for device-side transaction signing. Never leaves the device. */
+export async function getSolanaKeypair(): Promise<InstanceType<typeof Keypair> | null> {
+  const phrase = await SecureStore.getItemAsync(MNEMONIC_KEY);
+  if (!phrase) return null;
+  const seed = Mnemonic.fromPhrase(phrase).computeSeed();
+  const { key } = derivePath(SOLANA_DERIVATION_PATH, Buffer.from(seed).toString("hex"));
+  return Keypair.fromSeed(key);
+}
+
+/** EVM private key (0x-hex) for device-side signing on the given chain. */
+export async function getEvmPrivateKey(chain: Exclude<ChainId, "solana">): Promise<string | null> {
+  return exportPrivateKey(chain);
+}
+
 /** Permanently remove the device mnemonic (user-initiated wipe). */
 export async function wipeWallets(): Promise<void> {
   await SecureStore.deleteItemAsync(MNEMONIC_KEY);

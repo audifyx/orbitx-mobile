@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
@@ -12,6 +13,37 @@ const TABS: TabDef[] = [
   { name: "profile", label: "Profile", icon: "◯" },
 ];
 
+function TabButton({ focused, icon, label, onPress }: { focused: boolean; icon: string; label: string; onPress: () => void }) {
+  const s = useSharedValue(1);
+  const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  return (
+    <Pressable
+      onPress={() => { s.value = withSpring(0.82, { damping: 8 }, () => { s.value = withSpring(1); }); onPress(); }}
+      style={styles.tab}
+    >
+      <Animated.View style={[st, styles.tabInner]}>
+        <Text style={[styles.icon, focused && styles.iconActive]}>{icon}</Text>
+        <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function CenterButton({ onPress }: { onPress: () => void }) {
+  const s = useSharedValue(1);
+  const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  return (
+    <Pressable
+      onPress={() => { s.value = withSpring(0.85, { damping: 7 }, () => { s.value = withSpring(1); }); onPress(); }}
+      style={styles.centerWrap}
+    >
+      <Animated.View style={[styles.centerBtn, st]}>
+        <Text style={styles.centerIcon}>⚡</Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   return (
@@ -21,20 +53,9 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         if (!tab) return null;
         const focused = state.index === i;
         const onPress = () => navigation.navigate(route.name);
-        if (tab.center) {
-          return (
-            <Pressable key={route.key} onPress={onPress} style={styles.centerWrap}>
-              <View style={styles.centerBtn}>
-                <Text style={styles.centerIcon}>{tab.icon}</Text>
-              </View>
-            </Pressable>
-          );
-        }
+        if (tab.center) return <CenterButton key={route.key} onPress={onPress} />;
         return (
-          <Pressable key={route.key} onPress={onPress} style={styles.tab}>
-            <Text style={[styles.icon, focused && styles.iconActive]}>{tab.icon}</Text>
-            <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
-          </Pressable>
+          <TabButton key={route.key} focused={focused} icon={tab.icon} label={tab.label} onPress={onPress} />
         );
       })}
     </View>
@@ -75,6 +96,7 @@ const styles = StyleSheet.create({
     }),
   },
   tab: { alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 6, minWidth: 62 },
+  tabInner: { alignItems: "center", justifyContent: "center" },
   icon: { fontSize: 21, color: "rgba(255,255,255,0.45)" },
   iconActive: { color: "#fff" },
   label: { fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 2, fontWeight: "600" },
