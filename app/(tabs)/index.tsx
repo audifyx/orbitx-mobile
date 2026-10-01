@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PostCard, { type Post } from "../../components/PostCard";
 import Composer from "../../components/Composer";
+import Trending from "../../components/Trending";
 import { supabase } from "../../lib/supabase";
 
 function Header() {
@@ -79,6 +80,7 @@ export default function Home() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
       >
         <Composer onPosted={load} />
+        <Trending />
         {state === "nodb" && (
           <View style={styles.empty}>
             <Text style={styles.emptyT}>Feed backend not connected yet.</Text>

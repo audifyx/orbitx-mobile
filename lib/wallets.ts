@@ -14,6 +14,7 @@
  * Export (Profile -> Wallets) is the ONLY time key material is shown, after
  * explicit user confirmation.
  */
+import { Buffer } from "buffer";
 import * as SecureStore from "expo-secure-store";
 import { Mnemonic, HDNodeWallet, randomBytes } from "ethers";
 import { derivePath } from "ed25519-hd-key";

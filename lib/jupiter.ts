@@ -2,6 +2,7 @@
  * Solana swaps via Jupiter Lite (keyless public API) — signed ON-DEVICE
  * with the user's self-custody Solana keypair. We never see the key.
  */
+import { Buffer } from "buffer";
 import { Connection, VersionedTransaction, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getSolanaKeypair } from "./wallets";
 

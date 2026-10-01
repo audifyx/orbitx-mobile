@@ -6,53 +6,43 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { launchSolanaToken } from "../lib/launch-solana";
-import { launchEvmToken, EVM_LAUNCH_CHAINS, type EvmChainConfig } from "../lib/launch-evm";
+import { launchPumpToken, type QuotePair } from "../lib/pump";
 import { supabase } from "../lib/supabase";
 
-type ChainChoice = "solana" | EvmChainConfig["id"] | "arc" | "robinhood";
 type Step = "form" | "deploying" | "done";
 
-const CHAINS: { id: ChainChoice; label: string; live: boolean }[] = [
-  { id: "solana", label: "Solana", live: true },
-  { id: "base", label: "Base", live: true },
-  { id: "ethereum", label: "Ethereum", live: true },
-  { id: "arc", label: "Arc", live: false },
-  { id: "robinhood", label: "Robinhood Chain", live: false },
-];
-
+/**
+ * Launch — Solana-only, via the pump.fun program (mirrors the OrbitX launchpad).
+ * Vanity mint (…obx), SOL or USDC liquidity pair, working dev-buy.
+ * The user pays gas from their own wallet. Never a platform wallet.
+ */
 export default function Launch() {
   const insets = useSafeAreaInsets();
-  const [chain, setChain] = useState<ChainChoice>("solana");
+  const [pair, setPair] = useState<QuotePair>("sol");
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
-  const [supply, setSupply] = useState("1000000000");
   const [desc, setDesc] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [devBuy, setDevBuy] = useState("0");
   const [step, setStep] = useState<Step>("form");
   const [status, setStatus] = useState("");
-  const [result, setResult] = useState<{ id: string; explorer: string; tx: string } | null>(null);
+  const [result, setResult] = useState<{ mint: string; sig: string; devSig?: string; vanity: boolean } | null>(null);
 
   const pickImage = async () => {
     const r = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
     if (!r.canceled && r.assets[0]) setImage(r.assets[0].uri);
   };
 
-  const valid =
-    name.trim().length >= 2 &&
-    ticker.trim().length >= 2 &&
-    Number(supply) > 0 &&
-    (CHAINS.find((c) => c.id === chain)?.live ?? false);
+  const valid = name.trim().length >= 2 && ticker.trim().length >= 2;
 
   const deploy = () => {
+    const dev = Number(devBuy) || 0;
     Alert.alert(
-      `Launch $${ticker.toUpperCase()} on ${CHAINS.find((c) => c.id === chain)?.label}?`,
-      "This deploys from YOUR wallet and YOU pay the gas. This can't be undone.",
+      `Launch $${ticker.toUpperCase()} on pump.fun?`,
+      `Pair: ${pair === "sol" ? "SOL" : "USDC"}${dev > 0 ? `\nDev buy: ${dev} ${pair === "sol" ? "SOL" : "USDC"}` : "\nNo dev buy"}\n\nDeploys from YOUR wallet. You pay the gas. This can't be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "🚀 Launch", onPress: runDeploy },
@@ -62,48 +52,34 @@ export default function Launch() {
 
   const runDeploy = async () => {
     setStep("deploying");
-    setStatus("Preparing deployment…");
     try {
-      let id = "", explorer = "", tx = "";
-      const cleanTicker = ticker.trim().toUpperCase();
-      if (chain === "solana") {
-        setStatus("Uploading metadata…");
-        const r = await launchSolanaToken({
+      const r = await launchPumpToken(
+        {
           name: name.trim(),
-          symbol: cleanTicker,
+          symbol: ticker.trim().toUpperCase(),
           description: desc.trim(),
           imageUri: image ?? undefined,
-          supply: supply.trim(),
-        });
-        id = r.mint;
-        explorer = `https://solscan.io/token/${r.mint}`;
-        tx = r.signature;
-        setStatus("Token live on Solana!");
-      } else {
-        const cfg = EVM_LAUNCH_CHAINS.find((c) => c.id === chain)!;
-        setStatus(`Deploying to ${cfg.label}…`);
-        const r = await launchEvmToken(cfg, name.trim(), cleanTicker, supply.trim());
-        id = r.contract;
-        explorer = `${r.explorer}/address/${r.contract}`;
-        tx = r.txHash;
-        setStatus(`Token live on ${cfg.label}!`);
-      }
-      setResult({ id, explorer, tx });
-      // auto-socialize: post to the feed with the $CASHTAG
+          pair,
+          devBuySol: Number(devBuy) || 0,
+        },
+        setStatus
+      );
+      setResult({ mint: r.mint, sig: r.signature, devSig: r.devBuySignature, vanity: r.vanity });
+      // auto-post to the recently-launched feed with the $CASHTAG
       try {
         const { data } = await supabase.auth.getUser();
         if (data.user) {
           await supabase.from("posts").insert({
             user_id: data.user.id,
-            text: `🚀 Just launched $${cleanTicker} — ${name.trim()}. ${desc.trim()}`,
-            cashtags: [cleanTicker],
+            text: `🚀 Just launched $${ticker.trim().toUpperCase()} on pump.fun (${pair === "sol" ? "SOL" : "USDC"} pair)${r.vanity ? " — vanity mint …obx" : ""}. ${desc.trim()}`,
+            cashtags: [ticker.trim().toUpperCase()],
           });
         }
       } catch { /* feed is best-effort */ }
       setStep("done");
     } catch (e: any) {
       setStep("form");
-      Alert.alert("Launch failed", e?.message ?? "Something went wrong. Check your gas balance and try again.");
+      Alert.alert("Launch failed", e?.message ?? "Something went wrong. Check your SOL balance and try again.");
     }
   };
 
@@ -112,6 +88,7 @@ export default function Launch() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()}><Text style={styles.back}>←</Text></Pressable>
         <Text style={styles.title}>Launch a token</Text>
+        <View style={styles.pumpPill}><Text style={styles.pumpT}>pump.fun</Text></View>
       </View>
 
       {step === "deploying" ? (
@@ -125,9 +102,10 @@ export default function Launch() {
           <View style={styles.doneCard}>
             <Text style={styles.rocket}>🚀</Text>
             <Text style={styles.doneT}>${ticker.toUpperCase()} is live!</Text>
-            <Text style={styles.id} selectable numberOfLines={2}>{result.id}</Text>
-            <Pressable style={styles.btn} onPress={() => Linking.openURL(result.explorer)}>
-              <Text style={styles.btnT}>View on explorer →</Text>
+            {result.vanity && <Text style={styles.vanity}>✨ vanity mint …obx</Text>}
+            <Text style={styles.id} selectable numberOfLines={2}>{result.mint}</Text>
+            <Pressable style={styles.btn} onPress={() => Linking.openURL(`https://pump.fun/coin/${result.mint}`)}>
+              <Text style={styles.btnT}>View on pump.fun →</Text>
             </Pressable>
             <Pressable
               style={styles.ghost}
@@ -135,7 +113,7 @@ export default function Launch() {
             >
               <Text style={styles.ghostT}>Open token page</Text>
             </Pressable>
-            <Text style={styles.fine}>Auto-posted to your feed with ${ticker.toUpperCase()}</Text>
+            <Text style={styles.fine}>Auto-posted to recently launched with ${ticker.toUpperCase()}</Text>
             <Pressable style={styles.cancel} onPress={() => router.back()}>
               <Text style={styles.cancelT}>Done</Text>
             </Pressable>
@@ -143,16 +121,12 @@ export default function Launch() {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-          <Text style={styles.lbl}>CHAIN</Text>
-          <View style={styles.chainRow}>
-            {CHAINS.map((c) => (
-              <Pressable
-                key={c.id}
-                style={[styles.chip, chain === c.id && styles.chipA, !c.live && styles.chipOff]}
-                onPress={() => c.live && setChain(c.id)}
-              >
-                <Text style={[styles.chipT, chain === c.id && styles.chipTA]}>
-                  {c.label}{c.live ? "" : " · soon"}
+          <Text style={styles.lbl}>LIQUIDITY PAIR</Text>
+          <View style={styles.pairRow}>
+            {(["sol", "usdc"] as QuotePair[]).map((p) => (
+              <Pressable key={p} style={[styles.pair, pair === p && styles.pairA]} onPress={() => setPair(p)}>
+                <Text style={[styles.pairT, pair === p && styles.pairTA]}>
+                  {p === "sol" ? "◎ SOL" : "$ USDC"}
                 </Text>
               </Pressable>
             ))}
@@ -160,11 +134,7 @@ export default function Launch() {
 
           <Text style={styles.lbl}>TOKEN IMAGE</Text>
           <Pressable style={styles.imgBox} onPress={pickImage}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.img} />
-            ) : (
-              <Text style={styles.imgPh}>＋ Add image</Text>
-            )}
+            {image ? <Image source={{ uri: image }} style={styles.img} /> : <Text style={styles.imgPh}>＋ Add image</Text>}
           </Pressable>
 
           <Text style={styles.lbl}>NAME</Text>
@@ -176,20 +146,23 @@ export default function Launch() {
             value={ticker} onChangeText={(t) => setTicker(t.replace(/[^a-zA-Z0-9]/g, ""))} maxLength={10}
             autoCapitalize="characters" />
 
-          <Text style={styles.lbl}>TOTAL SUPPLY</Text>
-          <TextInput style={styles.in} placeholder="1000000000" placeholderTextColor="rgba(255,255,255,0.3)"
-            value={supply} onChangeText={(t) => setSupply(t.replace(/[^0-9]/g, ""))} keyboardType="number-pad" />
-
           <Text style={styles.lbl}>DESCRIPTION</Text>
           <TextInput style={[styles.in, styles.multi]} placeholder="What is this coin about?"
             placeholderTextColor="rgba(255,255,255,0.3)" value={desc} onChangeText={setDesc}
             multiline maxLength={280} />
 
+          <Text style={styles.lbl}>DEV BUY ({pair === "sol" ? "SOL" : "USDC"}) — OPTIONAL</Text>
+          <TextInput style={styles.in} placeholder="0" placeholderTextColor="rgba(255,255,255,0.3)"
+            value={devBuy} onChangeText={(t) => setDevBuy(t.replace(/[^0-9.]/g, ""))} keyboardType="decimal-pad" />
+          <Text style={styles.hint}>
+            Buy your own coin at launch from your wallet. {pair === "usdc" ? "Buys right after create — " : "Same transaction — "}you pay.
+          </Text>
+
           <Pressable style={[styles.btn, !valid && styles.btnDim]} onPress={deploy} disabled={!valid}>
-            <Text style={styles.btnT}>🚀 Launch token</Text>
+            <Text style={styles.btnT}>🚀 Launch on pump.fun</Text>
           </Pressable>
           <Text style={styles.fine}>
-            Deploys from your in-app wallet. You pay gas — never a platform wallet.
+            Vanity mint …obx when found. Deploys from your in-app wallet — you pay gas, never a platform wallet.
           </Text>
         </ScrollView>
       )}
@@ -199,22 +172,24 @@ export default function Launch() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
-  header: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#2f3336" },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#2f3336" },
   back: { color: "#fff", fontSize: 22 },
-  title: { color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.5 },
+  title: { color: "#fff", fontSize: 20, fontWeight: "800", letterSpacing: 0.5, flex: 1 },
+  pumpPill: { borderWidth: 1, borderColor: "#2f3336", borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12, backgroundColor: "#16181c" },
+  pumpT: { color: "#fff", fontSize: 12, fontWeight: "700" },
   pad: { padding: 16, paddingBottom: 60 },
   lbl: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "800", letterSpacing: 2, marginTop: 16, marginBottom: 8 },
-  chainRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { borderWidth: 1, borderColor: "#2f3336", borderRadius: 999, paddingVertical: 9, paddingHorizontal: 15, backgroundColor: "#000" },
-  chipA: { backgroundColor: "#fff", borderColor: "#fff" },
-  chipOff: { opacity: 0.4 },
-  chipT: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  chipTA: { color: "#000" },
+  pairRow: { flexDirection: "row", gap: 10 },
+  pair: { flex: 1, borderWidth: 1, borderColor: "#2f3336", borderRadius: 18, paddingVertical: 14, alignItems: "center", backgroundColor: "#000" },
+  pairA: { backgroundColor: "#fff", borderColor: "#fff" },
+  pairT: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  pairTA: { color: "#000" },
   imgBox: { width: 96, height: 96, borderRadius: 24, borderWidth: 1, borderColor: "#2f3336", borderStyle: "dashed", alignItems: "center", justifyContent: "center", backgroundColor: "#000", overflow: "hidden" },
   img: { width: 96, height: 96 },
   imgPh: { color: "rgba(255,255,255,0.45)", fontSize: 13, fontWeight: "600" },
   in: { backgroundColor: "#000", borderWidth: 1, borderColor: "#2f3336", borderRadius: 18, paddingVertical: 13, paddingHorizontal: 16, color: "#fff", fontSize: 16 },
   multi: { minHeight: 90, textAlignVertical: "top" },
+  hint: { color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 6, lineHeight: 17 },
   btn: { backgroundColor: "#fff", borderRadius: 999, paddingVertical: 17, alignItems: "center", marginTop: 24 },
   btnDim: { opacity: 0.35 },
   btnT: { color: "#000", fontWeight: "800", fontSize: 17 },
@@ -223,7 +198,8 @@ const styles = StyleSheet.create({
   status: { color: "#fff", fontSize: 17, fontWeight: "700", marginTop: 18, textAlign: "center" },
   doneCard: { backgroundColor: "#000", borderRadius: 28, borderWidth: 1, borderColor: "#2f3336", padding: 28, alignItems: "center" },
   rocket: { fontSize: 52, marginBottom: 12 },
-  doneT: { color: "#fff", fontSize: 24, fontWeight: "800", marginBottom: 10 },
+  doneT: { color: "#fff", fontSize: 24, fontWeight: "800", marginBottom: 6 },
+  vanity: { color: "#fff", fontSize: 13, fontWeight: "700", marginBottom: 8, opacity: 0.8 },
   id: { color: "rgba(255,255,255,0.55)", fontFamily: "monospace", fontSize: 12, textAlign: "center", marginBottom: 18 },
   ghost: { borderWidth: 1, borderColor: "#2f3336", borderRadius: 999, paddingVertical: 13, paddingHorizontal: 28, marginTop: 10 },
   ghostT: { color: "#fff", fontWeight: "700" },
