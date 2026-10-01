@@ -47,7 +47,7 @@ export default function PostCard({ post }: { post: Post }) {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
     if (!uid) return;
-    const table = kind === "like" ? "likes" : "reposts";
+    const table = kind === "like" ? "om_likes" : "om_reposts";
     const active = kind === "like" ? liked : reposted;
     try {
       if (active) {

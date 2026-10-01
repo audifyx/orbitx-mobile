@@ -19,12 +19,12 @@ export default function Profile() {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
     if (!uid) return;
-    const { data: p } = await supabase.from("profiles").select("*").eq("user_id", uid).maybeSingle();
+    const { data: p } = await supabase.from("om_profiles").select("*").eq("user_id", uid).maybeSingle();
     if (p) {
       setProfile(p);
       setName(p.display_name); setBio(p.bio ?? "");
       const { data: ps } = await supabase
-        .from("posts").select("id,user_id,text,created_at")
+        .from("om_posts").select("id,user_id,text,created_at")
         .eq("user_id", uid).order("created_at", { ascending: false }).limit(20);
       setPosts((ps ?? []).map((x: any) => ({ ...x, profiles: p })));
     } else {
@@ -32,7 +32,7 @@ export default function Profile() {
       const meta = data.user?.user_metadata ?? {};
       const handle = (meta.user_name ?? meta.preferred_username ?? `user${uid.slice(0, 6)}`).toString().toLowerCase().replace(/[^a-z0-9_]/g, "");
       const row = { user_id: uid, handle, display_name: meta.name ?? handle, bio: "" };
-      const { data: created } = await supabase.from("profiles").insert(row).select().maybeSingle();
+      const { data: created } = await supabase.from("om_profiles").insert(row).select().maybeSingle();
       if (created) { setProfile(created); setName(created.display_name); }
     }
   };
@@ -43,7 +43,7 @@ export default function Profile() {
     if (!profile || saving) return;
     setSaving(true);
     const { data } = await supabase.auth.getUser();
-    const { error } = await supabase.from("profiles")
+    const { error } = await supabase.from("om_profiles")
       .update({ display_name: name.trim() || profile.display_name, bio: bio.trim() })
       .eq("user_id", data.user!.id);
     setSaving(false);

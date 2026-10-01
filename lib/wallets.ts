@@ -93,7 +93,7 @@ export async function syncWalletAddresses(
     chain: c.id,
     address: addresses[c.id],
   }));
-  const { error } = await supabase.from("wallets").upsert(rows, { onConflict: "user_id,chain" });
+  const { error } = await supabase.from("om_wallets").upsert(rows, { onConflict: "user_id,chain" });
   if (error) throw error;
 }
 

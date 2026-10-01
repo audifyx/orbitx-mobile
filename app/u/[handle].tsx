@@ -21,21 +21,21 @@ export default function UserProfile() {
   const [following, setFollowing] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"posts" | "likes">("posts");
+  const [tab, setTab] = useState<"om_posts" | "om_likes">("om_posts");
 
   useEffect(() => {
     (async () => {
       if (!process.env.EXPO_PUBLIC_SUPABASE_URL) { setLoading(false); return; }
-      const { data: p } = await supabase.from("profiles").select("*").eq("handle", handle).maybeSingle();
+      const { data: p } = await supabase.from("om_profiles").select("*").eq("handle", handle).maybeSingle();
       if (!p) { setLoading(false); return; }
       setProfile(p);
       const { data: me } = await supabase.auth.getUser();
       const uid = me.user?.id;
       const [{ count: fc }, { count: gc }, { data: f }, { data: ps }] = await Promise.all([
-        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", p.user_id),
-        supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", p.user_id),
-        uid ? supabase.from("follows").select("*").eq("follower_id", uid).eq("following_id", p.user_id).maybeSingle() : { data: null },
-        supabase.from("posts").select("id,user_id,text,created_at").eq("user_id", p.user_id).order("created_at", { ascending: false }).limit(30),
+        supabase.from("om_follows").select("*", { count: "exact", head: true }).eq("following_id", p.user_id),
+        supabase.from("om_follows").select("*", { count: "exact", head: true }).eq("follower_id", p.user_id),
+        uid ? supabase.from("om_follows").select("*").eq("follower_id", uid).eq("following_id", p.user_id).maybeSingle() : { data: null },
+        supabase.from("om_posts").select("id,user_id,text,created_at").eq("user_id", p.user_id).order("created_at", { ascending: false }).limit(30),
       ]);
       setFollowers(fc ?? 0); setFollowing(gc ?? 0); setIsFollowing(!!f);
       setPosts((ps ?? []).map((x: any) => ({ ...x, profiles: p })));
@@ -48,10 +48,10 @@ export default function UserProfile() {
     const uid = data.user?.id;
     if (!uid || !profile || uid === profile.user_id) return;
     if (isFollowing) {
-      await supabase.from("follows").delete().eq("follower_id", uid).eq("following_id", profile.user_id);
+      await supabase.from("om_follows").delete().eq("follower_id", uid).eq("following_id", profile.user_id);
       setIsFollowing(false); setFollowers((c) => c - 1);
     } else {
-      await supabase.from("follows").insert({ follower_id: uid, following_id: profile.user_id });
+      await supabase.from("om_follows").insert({ follower_id: uid, following_id: profile.user_id });
       setIsFollowing(true); setFollowers((c) => c + 1);
     }
   };
@@ -85,13 +85,13 @@ export default function UserProfile() {
             <Text style={styles.count}><Text style={styles.bold}>{followers}</Text> Followers</Text>
           </View>
           <View style={styles.tabs}>
-            {(["posts", "likes"] as const).map((t) => (
+            {(["om_posts", "om_likes"] as const).map((t) => (
               <Pressable key={t} style={[styles.tab, tab === t && styles.tabA]} onPress={() => setTab(t)}>
-                <Text style={[styles.tabT, tab === t && styles.tabTA]}>{t === "posts" ? "Posts" : "Likes"}</Text>
+                <Text style={[styles.tabT, tab === t && styles.tabTA]}>{t === "om_posts" ? "Posts" : "Likes"}</Text>
               </Pressable>
             ))}
           </View>
-          {tab === "posts" ? (
+          {tab === "om_posts" ? (
             posts.length ? posts.map((p) => <PostCard key={p.id} post={p} />) : (
               <View style={styles.empty}><Text style={styles.emptyT}>No posts yet.</Text></View>
             )

@@ -33,22 +33,22 @@ export default function Home() {
       const { data: user } = await supabase.auth.getUser();
       const uid = user.user?.id;
       const { data, error } = await supabase
-        .from("posts")
-        .select("id,user_id,text,created_at,profiles!inner(handle,display_name,avatar_url)")
+        .from("om_posts")
+        .select("id,user_id,text,created_at,om_profiles!inner(handle,display_name,avatar_url)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
       const withCounts: Post[] = await Promise.all(
         (data ?? []).map(async (p: any) => {
           const [{ count: likes }, { count: reposts }] = await Promise.all([
-            supabase.from("likes").select("*", { count: "exact", head: true }).eq("post_id", p.id),
-            supabase.from("reposts").select("*", { count: "exact", head: true }).eq("post_id", p.id),
+            supabase.from("om_likes").select("*", { count: "exact", head: true }).eq("post_id", p.id),
+            supabase.from("om_reposts").select("*", { count: "exact", head: true }).eq("post_id", p.id),
           ]);
           let liked = false, reposted = false;
           if (uid) {
             const [{ data: l }, { data: r }] = await Promise.all([
-              supabase.from("likes").select("post_id").eq("user_id", uid).eq("post_id", p.id).maybeSingle(),
-              supabase.from("reposts").select("post_id").eq("user_id", uid).eq("post_id", p.id).maybeSingle(),
+              supabase.from("om_likes").select("post_id").eq("user_id", uid).eq("post_id", p.id).maybeSingle(),
+              supabase.from("om_reposts").select("post_id").eq("user_id", uid).eq("post_id", p.id).maybeSingle(),
             ]);
             liked = !!l; reposted = !!r;
           }

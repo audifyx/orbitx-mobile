@@ -16,7 +16,7 @@ export default function Composer({ onPosted }: { onPosted: () => void }) {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid) throw new Error("Sign in to post");
-      const { error } = await supabase.from("posts").insert({
+      const { error } = await supabase.from("om_posts").insert({
         user_id: uid,
         text: t,
         cashtags: extractCashtags(t),

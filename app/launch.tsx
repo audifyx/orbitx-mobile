@@ -65,14 +65,26 @@ export default function Launch() {
         setStatus
       );
       setResult({ mint: r.mint, sig: r.signature, devSig: r.devBuySignature, vanity: r.vanity });
-      // auto-post to the recently-launched feed with the $CASHTAG
+      // auto-post to the recently-launched feed with the $CASHTAG + track the launch
       try {
         const { data } = await supabase.auth.getUser();
         if (data.user) {
-          await supabase.from("posts").insert({
+          const { data: post } = await supabase.from("om_posts").insert({
             user_id: data.user.id,
             text: `🚀 Just launched $${ticker.trim().toUpperCase()} on pump.fun (${pair === "sol" ? "SOL" : "USDC"} pair)${r.vanity ? " — vanity mint …obx" : ""}. ${desc.trim()}`,
             cashtags: [ticker.trim().toUpperCase()],
+          }).select("id").maybeSingle();
+          await supabase.from("om_launches").insert({
+            user_id: data.user.id,
+            post_id: post?.id ?? null,
+            mint: r.mint,
+            name: name.trim(),
+            symbol: ticker.trim().toUpperCase(),
+            pair,
+            signature: r.signature,
+            dev_buy_signature: r.devBuySignature ?? null,
+            vanity: r.vanity,
+            metadata_uri: r.metadataUri ?? null,
           });
         }
       } catch { /* feed is best-effort */ }
